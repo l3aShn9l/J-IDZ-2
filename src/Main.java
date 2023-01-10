@@ -9,14 +9,7 @@ public class Main {
         path = in.nextLine();
         try {
             FileSystem fs = new FileSystem(path);
-            Set<FileObject> loops = fs.searchLoops();
-            if(!loops.isEmpty()){
-                StringBuilder message = new StringBuilder("[Error] There are loop in files: \n");
-                for (FileObject file : loops) {
-                    message.append(fs.getPath(file.file)).append("\n");
-                }
-                throw new Exception(message.toString());
-            }
+            fs.searchLoops();
             Vector<FileObject> orderedByDependency = fs.orderByDependency();
             fs.buildFiles(orderedByDependency);
         } catch (Exception ex) {

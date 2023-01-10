@@ -18,7 +18,7 @@ public class FileSystem {
         orderedByNameFiles = new Vector<>();
         dependencyMatrix = new Hashtable<>();
         if (!directory.isDirectory()) {
-            throw new Exception("Wrong path");
+            throw new Exception("Incorrect path");
         }
         System.out.println("Getting files...");
         getFiles(directoryPath);
@@ -33,6 +33,10 @@ public class FileSystem {
         updateDependencies();
     }
 
+    /**
+     * С помощью функции мы получаем все файлы в корневой директории и ее поддиректориях.
+     * @param directoryPath Путь до корневой директории.
+     */
     private void getFiles(String directoryPath) {
         File directory = new File(directoryPath);
         for (File o : Objects.requireNonNull(directory.listFiles())) {
@@ -44,9 +48,15 @@ public class FileSystem {
         }
     }
 
+    /**
+     * Функция возвращает нам путь файла в необходимом для задания формате.
+     * @param file Файл, путь которого мы хотим привести в необходимый нам формат.
+     * @return Возвращает путь в необходимом формате.
+     * @throws Exception Выбрасывает сообщение об ошибке, если не удается совершить file.getName().
+     */
     public String getPath(File file) throws Exception {
         if (!file.getAbsolutePath().contains(directory.getName())) {
-            throw new Exception("Error 1");
+            throw new Exception("Error");
         }
         File parent = file.getParentFile();
         StringBuilder path = new StringBuilder(file.getName().substring(0, file.getName().lastIndexOf('.')));
@@ -57,31 +67,51 @@ public class FileSystem {
         return path.toString();
     }
 
+    /**
+     * Обновляет матрицу зависимостей, а также проверяет все require. Многострочнымми комментариями закомментирован вывод получившейся матрицы зависимостей.
+     * @throws Exception Выбрасывает сообщение об ошибке, если обнаружены некорректные require или же не удается совершить getPath(file.file).
+     */
     private void updateDependencies() throws Exception {
         System.out.println("Updating dependencies...");
-        /*
-        System.out.println("Dependency matrix: ");
-        */
+        StringBuilder message = new StringBuilder("[Error] Incorrect dependencies\n");
         for (FileObject file : orderedByNameFiles) {
-            for (FileObject another : orderedByNameFiles) {
-                if (file.text.contains("require ‘" + getPath(another.file) + "’")) {
-                    dependencyMatrix.get(file).replace(another, true);
-                    /*
-                    System.out.print("1 ");
-                    */
-                } else {
-                    /*
-                    System.out.print("0 ");
-                    */
+            boolean error = false;
+            Pattern pattern = Pattern.compile("require ‘.+?’");
+            Matcher matcher = pattern.matcher(file.text);
+            StringBuilder badDependencies = new StringBuilder("File " + getPath(file.file) + " have dependency with nonexistent files: \n");
+            while (matcher.find()) {
+                String result = file.text.substring(matcher.start(), matcher.end());
+                boolean invalid = true;
+                for (FileObject another : orderedByNameFiles) {
+                    if (result.equals("require ‘" + getPath(another.file) + "’")) {
+                        dependencyMatrix.get(file).replace(another, true);
+                        invalid = false;
+                    }
+                }
+                if(invalid){
+                    error = true;
+                    badDependencies.append(result).append("\n");
                 }
             }
-
-            /*
-            System.out.print("\n");
-            */
+            if (error){
+                message.append(badDependencies);
+            }
         }
+        if(!message.toString().equals("[Error] Incorrect dependencies\n")){
+            throw new Exception(message.toString());
+        }
+        //Вывод полученной матрицы зависимостей
+        /*
+        System.out.println("Dependency matrix: ");
+        printOrderedMatrix(dependencyMatrix);
+        */
     }
 
+    /**
+     * Функция возвращает файлы, которые являются листовыми или корневыми в переданной матрице зависимостей.
+     * @param matrix Обрабатываемая матрица зависимостей.
+     * @return Возвращает вектор файлов, которые являются листовыми (не имеют зависимостей) или корневыми (не имеют зависимых файлов).
+     */
     private Vector<FileObject> getLeavesAndRoots(Hashtable<FileObject, Hashtable<FileObject, Boolean>> matrix) {
         Vector<FileObject> deletable = new Vector<>();
         Set<FileObject> keySetX = matrix.keySet();
@@ -109,6 +139,11 @@ public class FileSystem {
         return deletable;
     }
 
+    /**
+     * Функция возвращает файлы, которые являются листовыми в переданной матрице зависимостей.
+     * @param matrix Обрабатываемая матрица зависимостей.
+     * @return Возвращает вектор файлов, которые являются листовыми (не имеют зависимостей).
+     */
     private Vector<FileObject> getLeaves(Hashtable<FileObject, Hashtable<FileObject, Boolean>> matrix) {
         Vector<FileObject> deletable = new Vector<>();
         Set<FileObject> keySetX = matrix.keySet();
@@ -126,6 +161,7 @@ public class FileSystem {
         return deletable;
     }
 
+    /*
     private Hashtable<FileObject, Hashtable<FileObject, Boolean>> getUnorderedDependencyMatrixCopy() {
         Hashtable<FileObject, Hashtable<FileObject, Boolean>> copy = new Hashtable<>();
         Set<FileObject> kSX = dependencyMatrix.keySet();
@@ -139,8 +175,55 @@ public class FileSystem {
         }
         return copy;
     }
+    */
 
-    private void printMatrix(Hashtable<FileObject, Hashtable<FileObject, Boolean>> matrix) {
+    /**
+     * Функция отвечает за вывод матрицы зависимостей в отсортированном по имени виде, в отличии от своего закомментированого аналога.
+     * @param matrix Матрица передаваемая для вывода.
+     */
+    private void printOrderedMatrix(Hashtable<FileObject, Hashtable<FileObject, Boolean>> matrix) {
+        Set<FileObject> kSX = matrix.keySet();
+        for (FileObject elX : orderedByNameFiles) {
+            if(kSX.contains(elX)) {
+                Set<FileObject> kSY = matrix.get(elX).keySet();
+                for (FileObject elY : orderedByNameFiles) {
+                    if(kSY.contains(elY)) {
+                        if (matrix.get(elX).get(elY)) {
+                            System.out.print("1 ");
+                        } else {
+                            System.out.print("0 ");
+                        }
+                    }
+                }
+                System.out.print("\n");
+            }
+        }
+        System.out.print("\n");
+    }
+
+    /**
+     * Функция отвечает за получение копии главной матрицы зависимостей в отсортированном по имени виде, в отличии от своего закомментированого аналога.
+     * @return Возвращает копию матрицы зависимостей в отсортированном по имени виде.
+     */
+    private Hashtable<FileObject, Hashtable<FileObject, Boolean>> getOrderedDependencyMatrixCopy() {
+        Hashtable<FileObject, Hashtable<FileObject, Boolean>> copy = new Hashtable<>();
+        Set<FileObject> kSX = dependencyMatrix.keySet();
+        for (FileObject elX : orderedByNameFiles) {
+            if (kSX.contains(elX)) {
+                Set<FileObject> kSY = dependencyMatrix.get(elX).keySet();
+                Hashtable<FileObject, Boolean> v = new Hashtable<>();
+                for (FileObject elY : orderedByNameFiles) {
+                    if(kSY.contains(elY)) {
+                        v.put(elY, dependencyMatrix.get(elX).get(elY));
+                    }
+                }
+                copy.put(elX, v);
+            }
+        }
+        return copy;
+    }
+    /*
+    private void printUnorderedMatrix(Hashtable<FileObject, Hashtable<FileObject, Boolean>> matrix) {
         Set<FileObject> kSX = matrix.keySet();
         for (FileObject elX : kSX) {
             Set<FileObject> kSY = matrix.get(elX).keySet();
@@ -155,13 +238,18 @@ public class FileSystem {
         }
         System.out.print("\n");
     }
+    */
 
-    public Set<FileObject> searchLoops() throws Exception {
+    /**
+     * Проверка исходных данных на зацикливания. За многострочными комментариями скрыт код для отладки, который по шагам иллюстрирует процесс поиска зацикливаний.
+     * @throws Exception Выбрасывает сообщение об ошибке, если обнаружены зацикливания в исходных данных.
+     */
+    public void searchLoops() throws Exception {
         System.out.println("Searching loops...");
-        Hashtable<FileObject, Hashtable<FileObject, Boolean>> copy = getUnorderedDependencyMatrixCopy();
+        Hashtable<FileObject, Hashtable<FileObject, Boolean>> copy = getOrderedDependencyMatrixCopy();
         /*
-        System.out.println("Unordered dependency matrix:");
-        printMatrix(copy);
+        System.out.println("Dependency matrix:");
+        printOrderedMatrix(copy);
         */
         Vector<FileObject> deletable = getLeavesAndRoots(copy);
         while (!deletable.isEmpty()) {
@@ -179,20 +267,31 @@ public class FileSystem {
                     copy.get(fileX).remove(file);
                 }
                 /*
-                printMatrix(copy);
+                printOrderedMatrix(copy);
                 */
             }
             deletable = getLeavesAndRoots(copy);
         }
-        return copy.keySet();
+        if(!copy.keySet().isEmpty()){
+            StringBuilder message = new StringBuilder("[Error] There are loop in files: \n");
+            for (FileObject file : copy.keySet()) {
+                message.append(getPath(file.file)).append("\n");
+            }
+            throw new Exception(message.toString());
+        }
     }
 
+    /**
+     * Функция отвечает за получение упорядоченного по уровню зависимости списка файлов. За многострочными комментариями скрыт код для отладки, который по шагам иллюстрирует процесс поиска зацикливаний, а также дает возможность посмотреть на полученный список.
+     * @return Возвращает упорядоченный по уровню зависимости список файлов.
+     * @throws Exception Выбрасывает сообщение об ошибке, если не доработает до конца (больше для отладки).
+     */
     public Vector<FileObject> orderByDependency() throws Exception {
         System.out.println("Ordering files by dependency...");
-        Hashtable<FileObject, Hashtable<FileObject, Boolean>> copy = getUnorderedDependencyMatrixCopy();
+        Hashtable<FileObject, Hashtable<FileObject, Boolean>> copy = getOrderedDependencyMatrixCopy();
         /*
-        System.out.println("Unordered dependency matrix:");
-        printMatrix(copy);
+        System.out.println("Dependency matrix:");
+        printOrderedMatrix(copy);
         */
         Vector<FileObject> deletable = getLeaves(copy);
         Vector<FileObject> orderedByDependency = new Vector<>();
@@ -212,14 +311,15 @@ public class FileSystem {
                     copy.get(fileX).remove(file);
                 }
                 /*
-                printMatrix(copy);
+                printOrderedMatrix(copy);
                 */
             }
             deletable = getLeaves(copy);
         }
         if (copy.size() != 0) {
-            throw new Exception("Error 2");
+            throw new Exception("Error");
         }
+        //Ниже вывод списка файлов упорядоченного по уровню зависимости
         /*
         System.out.println("Ordered by dependency list: ");
         for (FileObject file:orderedByDependency) {
@@ -229,6 +329,11 @@ public class FileSystem {
         return orderedByDependency;
     }
 
+    /**
+     * Функция отвечает за конечную сборку всех файлов
+     * @param orderedByDependency Получает упорядоченный по уровню зависимости список файлов
+     * @throws Exception Выбрасывает сообщение об ошибке, если не удается совершить getPath(another.file)
+     */
     public void buildFiles(Vector<FileObject> orderedByDependency) throws Exception {
         System.out.println("Building files...");
         for (FileObject file : orderedByDependency) {
@@ -236,16 +341,6 @@ public class FileSystem {
                 if (file.text.contains("require ‘" + getPath(another.file) + "’")) {
                     file.text = file.text.replaceAll("require ‘" + getPath(another.file) + "’", another.text);
                 }
-            }
-            Pattern pattern = Pattern.compile("require ‘.+?’");
-            Matcher matcher = pattern.matcher(file.text);
-            if (matcher.find()) {
-                StringBuilder message = new StringBuilder("[Error] File " + getPath(file.file) + " have dependency with nonexistent file: \n");
-                message.append(file.text.substring(matcher.start(), matcher.end())).append("\n");
-                while (matcher.find()) {
-                    message.append(file.text.substring(matcher.start(), matcher.end())).append("\n");
-                }
-                throw new Exception(message.toString());
             }
             try (FileWriter writer = new FileWriter(file.file, false)) {
                 writer.write(file.text);
